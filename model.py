@@ -4,6 +4,11 @@ import torch.nn.functional as F
 
 from model_parts import *
 
+from torchvision import models
+from torchvision.models.resnet import ResNet
+from torchvision.models.resnet import BasicBlock
+from torchvision.models.resnet import Bottleneck
+
 class UNet(nn.Module):
     def __init__(self, in_channels, n_classes):
         super(UNet, self).__init__()
@@ -30,3 +35,59 @@ class UNet(nn.Module):
         x = self.up4(x, x1)
         x = self.outc(x)
         return torch.sigmoid(x)
+
+def up_conv(in_channels, out_channels):
+    return nn.ConvTranspose2d(in_channels, out_channels, kernel_size=2, stride=2)
+
+class ResNetUNet(nn.Module):
+
+    def __init__(self, in_channels, n_classes=12):
+        super().__init__()
+        self.encoder = models.resnet34(pretrained=False)
+        self.encoder.conv1 = nn.Conv2d(in_channels, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+        self.encoder_layers = list(self.encoder.children())
+        
+        self.block1 = nn.Sequential(*self.encoder_layers[:3])
+        self.block2 = nn.Sequential(*self.encoder_layers[3:5])
+        self.block3 = self.encoder_layers[5]
+        self.block4 = self.encoder_layers[6]
+        self.block5 = self.encoder_layers[7]
+
+        self.up_conv6 = up_conv(512, 512)
+        self.conv6 = double_conv(512 + 256, 512)
+        self.up_conv7 = up_conv(512, 256)
+        self.conv7 = double_conv(256 + 128, 256)
+        self.up_conv8 = up_conv(256, 128)
+        self.conv8 = double_conv(128 + 64, 128)
+        self.up_conv9 = up_conv(128, 64)
+        self.conv9 = double_conv(64 + 64, 64)
+        self.up_conv10 = up_conv(64, 32)
+        self.conv10 = nn.Conv2d(32, n_classes, kernel_size=1)
+
+    def forward(self, x):
+        block1 = self.block1(x)
+        block2 = self.block2(block1)
+        block3 = self.block3(block2)
+        block4 = self.block4(block3)
+        block5 = self.block5(block4)
+
+        x = self.up_conv6(block5)
+        x = torch.cat([x, block4], dim=1)
+        x = self.conv6(x)
+
+        x = self.up_conv7(x)
+        x = torch.cat([x, block3], dim=1)
+        x = self.conv7(x)
+
+        x = self.up_conv8(x)
+        x = torch.cat([x, block2], dim=1)
+        x = self.conv8(x)
+
+        x = self.up_conv9(x)
+        x = torch.cat([x, block1], dim=1)
+        x = self.conv9(x)
+
+        x = self.up_conv10(x)
+        x = self.conv10(x)
+
+        return x

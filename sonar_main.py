@@ -74,7 +74,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
             dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
         )
 
-        model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
+        model = ResNetUNet(in_channels=1, n_classes=len(classes)).to(device).train()#UNet(in_channels=1, n_classes=len(classes)).to(device).train()
         # print(model)
 
 
