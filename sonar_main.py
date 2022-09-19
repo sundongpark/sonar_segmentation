@@ -1,10 +1,18 @@
 import torch
 from sonar_loader import *
-from sklearn.model_selection import KFold
 from model import *
 from eval import *
 import tqdm
+import random
 
+random_seed = 0
+torch.manual_seed(random_seed)
+torch.cuda.manual_seed(random_seed)
+torch.cuda.manual_seed_all(random_seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+np.random.seed(random_seed)
+random.seed(random_seed)
 
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
@@ -39,8 +47,6 @@ def validation_epoch(model, val_loader, num_class, device, epoch):
     return mean_iou
 
 def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path=''):
-    num_val = 200
-    fold_num = 4
     lr = 0.001
     save_term = 5
 
@@ -50,76 +56,57 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
     data_path = './data/segmentation/'
 
-    total_dataset = sonarDataset(data_path, classes)
+    dataset_train = sonarDataset(data_path + 'train', classes)
+    dataset_val = sonarDataset(data_path + 'val', classes)
+    dataset_test = sonarDataset(data_path + 'test', classes)
 
-    total_len = len(list(natsort.natsorted(os.listdir(os.path.join(data_path, "Images")))))
-    total_len = list(range(0,total_len))
-    kfold = KFold(n_splits=fold_num, shuffle=False)
+    data_loader = torch.utils.data.DataLoader(
+        dataset_train, batch_size=train_batch_size, shuffle=True, num_workers=0
+    )
+    data_loader_val = torch.utils.data.DataLoader(
+        dataset_val, batch_size=test_batch_size, shuffle=True, num_workers=0
+    )
+    data_loader_test = torch.utils.data.DataLoader(
+        dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
+    )
 
-    for fold, (train_idx, test_ids) in enumerate(kfold.split(total_len)):
-        if fold != 0:
-            break
-        dataset = torch.utils.data.Subset(total_dataset, train_idx[num_val:])
-        dataset_val = torch.utils.data.Subset(total_dataset, train_idx[:num_val])
-        dataset_test = torch.utils.data.Subset(total_dataset, test_ids)
+    model = ResNetUNet(in_channels=1, n_classes=len(classes)).to(device).train() # UNet(in_channels=1, n_classes=len(classes)).to(device).train()
 
+    if 'train' in mode:
+        if pretrained:
+            pre_path = './checkpoints/UNet_b16_e_30.pth'
+            model.load_state_dict(torch.load(pre_path))
+            print('Model loaded from {}'.format(pre_path))
 
-        data_loader = torch.utils.data.DataLoader(
-            dataset, batch_size=train_batch_size, shuffle=True, num_workers=0
-        )
-        data_loader_val = torch.utils.data.DataLoader(
-            dataset_val, batch_size=test_batch_size, shuffle=True, num_workers=0
-        )
-        data_loader_test = torch.utils.data.DataLoader(
-            dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
-        )
+        print('Starting training: '
+              'Epochs: {num_epoch}'
+              'Batch size: {train_batch_size}'
+              'Learning rate: {lr}'
+              'Training size: {len(data_loader.dataset)}'
+              'Device: {str(device)}')
 
-        model = ResNetUNet(in_channels=1, n_classes=len(classes)).to(device).train()#UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-        # print(model)
+        optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
+        lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
+        loss_function = torch.nn.CrossEntropyLoss()
 
+        for epoch in range(1, num_epoch+1):
+            print('*** Starting epoch {}/{}. ***'.format(epoch, num_epoch))
 
-        if 'train' in mode:
+            train_function(data_loader, model, optimizer, loss_function, lr_scheduler, device)
+            lr_scheduler.step()
 
-            if pretrained:
-                pre_path = ''
-                model.load_state_dict(torch.load(pre_path))
-                print('Model loaded from {}'.format(pre_path))
+            validation_epoch(model, data_loader_val, len(classes), device, epoch)
 
-            print('Starting training: '
-                  'Epochs: {num_epoch}'
-                  'Batch size: {train_batch_size}'
-                  'Learning rate: {lr}'
-                  'Training size: {len(data_loader.dataset)}'
-                  'Device: {str(device)}')
+            if epoch % save_term == 0:
+                state_dict = model.state_dict()
+                if device == "cuda":
+                    state_dict = model.module.state_dict()
+                torch.save(state_dict, dir_checkpoint + f'_e_{epoch}.pth')
+                print('Checkpoint epoch: {} saved !'.format(epoch))
 
-            optimizer = torch.optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)
-            # optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-
-
-            # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=int(0.3 * epochs), gamma=0.1)
-            lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
-
-            loss_function = torch.nn.CrossEntropyLoss()
-
-            for epoch in range(num_epoch):
-                print('*** Starting epoch {}/{}. ***'.format(epoch, num_epoch))
-
-                train_function(data_loader, model, optimizer, loss_function, lr_scheduler, device)
-                lr_scheduler.step()
-
-                validation_epoch(model, data_loader_val, len(classes), device, epoch)
-
-                if epoch % save_term == 0:
-                    state_dict = model.state_dict()
-                    if device == "cuda":
-                        state_dict = model.module.state_dict()
-                    torch.save(state_dict, dir_checkpoint + f'_e_{epoch}.pth')
-                    print('Checkpoint epoch: {} saved !'.format(epoch))
-
-                print('****************************\n\n')
-
-
-
+            print('****************************')
+        print('*** Test ***')
+        validation_epoch(model, data_loader_test, len(classes), device, epoch='test')
 
 if __name__ =="__main__":
 
@@ -135,6 +122,6 @@ if __name__ =="__main__":
                'standing-bottle', 'tire', 'valve', 'wall']
 
 
-    main(mode='train', gpu_id=0, num_epoch=31,
+    main(mode='train', gpu_id=0, num_epoch=30,
          train_batch_size=16, test_batch_size=1, classes=CLASSES,
          pretrained=False, save_path='')
