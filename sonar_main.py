@@ -5,7 +5,7 @@ from eval import *
 import tqdm
 import random
 
-random_seed = 0
+random_seed = 99
 torch.manual_seed(random_seed)
 torch.cuda.manual_seed(random_seed)
 torch.cuda.manual_seed_all(random_seed)
