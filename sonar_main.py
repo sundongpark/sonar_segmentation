@@ -4,8 +4,9 @@ from model import *
 from eval import *
 import tqdm
 import random
-
-random_seed = 99
+from loss import FocalLoss
+'''
+random_seed = 42
 torch.manual_seed(random_seed)
 torch.cuda.manual_seed(random_seed)
 torch.cuda.manual_seed_all(random_seed)
@@ -13,7 +14,7 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 np.random.seed(random_seed)
 random.seed(random_seed)
-
+'''
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
     epoch_loss = 0
@@ -70,7 +71,9 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
     )
 
-    model = ResNetUNet(in_channels=1, n_classes=len(classes)).to(device).train() # UNet(in_channels=1, n_classes=len(classes)).to(device).train()
+    model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet101).to(device).train()
+    # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
+    # model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
 
     if 'train' in mode:
         if pretrained:
@@ -78,16 +81,16 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
             model.load_state_dict(torch.load(pre_path))
             print('Model loaded from {}'.format(pre_path))
 
-        print('Starting training: '
-              'Epochs: {num_epoch}'
-              'Batch size: {train_batch_size}'
-              'Learning rate: {lr}'
-              'Training size: {len(data_loader.dataset)}'
-              'Device: {str(device)}')
+        print('Starting training:\n'
+              f'Epochs: {num_epoch}\n'
+              f'Batch size: {train_batch_size}\n'
+              f'Learning rate: {lr}\n'
+              f'Training size: {len(data_loader.dataset)}\n'
+              f'Device: {str(device)}\n')
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
-        loss_function = torch.nn.CrossEntropyLoss()
+        loss_function = FocalLoss(0.25)   # torch.nn.CrossEntropyLoss()
 
         for epoch in range(1, num_epoch+1):
             print('*** Starting epoch {}/{}. ***'.format(epoch, num_epoch))
@@ -110,18 +113,11 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
 if __name__ =="__main__":
 
-    # TODO
-    '''
-    1. Iou equation check 
-    2. visualization (12 color) - complete
-    3. test    
-    '''
-
     CLASSES = ['background', 'bottle', 'can', 'chain',
                'drink-carton', 'hook', 'propeller', 'shampoo-bottle',
                'standing-bottle', 'tire', 'valve', 'wall']
 
 
     main(mode='train', gpu_id=0, num_epoch=30,
-         train_batch_size=16, test_batch_size=1, classes=CLASSES,
+         train_batch_size=8, test_batch_size=1, classes=CLASSES,
          pretrained=False, save_path='')
