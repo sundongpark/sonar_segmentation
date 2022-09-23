@@ -51,7 +51,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
     lr = 0.001
     save_term = 5
 
-    dir_checkpoint = f'./checkpoints/UNet_b{train_batch_size}'
+    dir_checkpoint = './checkpoints/'
 
     device = torch.device(f'cuda:{gpu_id}') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -71,13 +71,13 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
     )
 
-    model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet101).to(device).train()
+    # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet50).to(device).train()
     # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-    # model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
+    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet34).to(device).train() 
 
     if 'train' in mode:
         if pretrained:
-            pre_path = './checkpoints/UNet_b16_e_30.pth'
+            pre_path = './checkpoints/best_model.pth'
             model.load_state_dict(torch.load(pre_path))
             print('Model loaded from {}'.format(pre_path))
 
@@ -92,23 +92,36 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
         loss_function = FocalLoss(0.25)   # torch.nn.CrossEntropyLoss()
 
+        max_score = 0
+        max_score_epoch = 0
         for epoch in range(1, num_epoch+1):
             print('*** Starting epoch {}/{}. ***'.format(epoch, num_epoch))
 
             train_function(data_loader, model, optimizer, loss_function, lr_scheduler, device)
             lr_scheduler.step()
 
-            validation_epoch(model, data_loader_val, len(classes), device, epoch)
+            mean_iou = validation_epoch(model, data_loader_val, len(classes), device, epoch)
 
+            state_dict = model.state_dict()
+            if device == "cuda":
+                state_dict = model.module.state_dict()
             if epoch % save_term == 0:
                 state_dict = model.state_dict()
                 if device == "cuda":
                     state_dict = model.module.state_dict()
-                torch.save(state_dict, dir_checkpoint + f'_e_{epoch}.pth')
+                torch.save(state_dict, dir_checkpoint + f'{epoch}.pth')
                 print('Checkpoint epoch: {} saved !'.format(epoch))
+            if max_score < mean_iou:
+                max_score = mean_iou
+                max_score_epoch = epoch
+                print('Best Model saved!')
+                torch.save(state_dict, dir_checkpoint + 'best_model.pth')
+            if epoch >= max_score_epoch + 3:
+                break
 
             print('****************************')
         print('*** Test ***')
+        model.load_state_dict(torch.load(pre_path))
         validation_epoch(model, data_loader_test, len(classes), device, epoch='test')
 
 if __name__ =="__main__":
