@@ -15,6 +15,9 @@ torch.backends.cudnn.benchmark = False
 np.random.seed(random_seed)
 random.seed(random_seed)
 '''
+
+pre_path = './checkpoints/best_model.pth'
+
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
     epoch_loss = 0
@@ -71,13 +74,12 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
     )
 
-    # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet50).to(device).train()
+    # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet152).to(device).train()
     # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet34).to(device).train() 
+    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
 
     if 'train' in mode:
         if pretrained:
-            pre_path = './checkpoints/best_model.pth'
             model.load_state_dict(torch.load(pre_path))
             print('Model loaded from {}'.format(pre_path))
 
@@ -90,7 +92,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
-        loss_function = FocalLoss(0.25)   # torch.nn.CrossEntropyLoss()
+        loss_function = torch.nn.CrossEntropyLoss() # FocalLoss(0.25)   # torch.nn.CrossEntropyLoss()
 
         max_score = 0
         max_score_epoch = 0
@@ -132,5 +134,5 @@ if __name__ =="__main__":
 
 
     main(mode='train', gpu_id=0, num_epoch=30,
-         train_batch_size=8, test_batch_size=1, classes=CLASSES,
+         train_batch_size=16, test_batch_size=1, classes=CLASSES,
          pretrained=False, save_path='')
