@@ -50,7 +50,7 @@ def train_function(data, model, optimizer, loss_function, scheduler, device):
 def validation_epoch(model, val_loader, num_class, device, epoch):
     class_iou, mean_iou = eval_net_loader(model, val_loader, num_class, device, epoch)
     print('Class IoU:', ' '.join(f'{x:.4f}' for x in class_iou), f'  |  Mean IoU: {mean_iou:.4f}')
-    if save_csv:
+    if save_csv and epoch == 'test':
         with open(f'{csv_path}alpha_{alpha}_results_{iter}.csv', 'w', newline='') as f:
             w = csv.writer(f, delimiter='\n')
             w.writerow(class_iou)
@@ -141,6 +141,6 @@ if __name__ =="__main__":
                'standing-bottle', 'tire', 'valve', 'wall']
     for alpha in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
         for iter in range(5):
-            main(mode='train', gpu_id=0, num_epoch=1,
+            main(mode='train', gpu_id=0, num_epoch=30,
                 train_batch_size=16, test_batch_size=1, classes=CLASSES,
                 pretrained=False, save_path='', loss_fn=FocalLoss(alpha, 2.0))
