@@ -4,6 +4,7 @@ from model import *
 from eval import *
 import tqdm
 import random
+import csv
 from loss import FocalLoss
 '''
 random_seed = 42
@@ -17,6 +18,8 @@ random.seed(random_seed)
 '''
 
 pre_path = './checkpoints/best_model.pth'
+save_csv = True
+csv_path = 'H:/내 드라이브/SONAR_Semantic_Segmentation/results/'
 
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
@@ -47,10 +50,14 @@ def train_function(data, model, optimizer, loss_function, scheduler, device):
 def validation_epoch(model, val_loader, num_class, device, epoch):
     class_iou, mean_iou = eval_net_loader(model, val_loader, num_class, device, epoch)
     print('Class IoU:', ' '.join(f'{x:.4f}' for x in class_iou), f'  |  Mean IoU: {mean_iou:.4f}')
-
+    if save_csv:
+        with open(f'{csv_path}alpha_{alpha}_results_{iter}.csv', 'w', newline='') as f:
+            w = csv.writer(f, delimiter='\n')
+            w.writerow(class_iou)
+            w.writerow([mean_iou])
     return mean_iou
 
-def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path=''):
+def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path='', loss_fn = FocalLoss(0.25, 2.0)):
     lr = 0.001
     save_term = 5
 
@@ -76,7 +83,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
     # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet152).to(device).train()
     # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
+    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet34).to(device).train() 
 
     if 'train' in mode:
         if pretrained:
@@ -92,7 +99,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
-        loss_function = torch.nn.CrossEntropyLoss() # FocalLoss(0.25)   # torch.nn.CrossEntropyLoss()
+        loss_function = loss_fn   # torch.nn.CrossEntropyLoss()
 
         max_score = 0
         max_score_epoch = 0
@@ -118,9 +125,10 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
                 max_score_epoch = epoch
                 print('Best Model saved!')
                 torch.save(state_dict, dir_checkpoint + 'best_model.pth')
+            '''
             if epoch >= max_score_epoch + 3:
                 break
-
+            '''
             print('****************************')
         print('*** Test ***')
         model.load_state_dict(torch.load(pre_path))
@@ -131,8 +139,8 @@ if __name__ =="__main__":
     CLASSES = ['background', 'bottle', 'can', 'chain',
                'drink-carton', 'hook', 'propeller', 'shampoo-bottle',
                'standing-bottle', 'tire', 'valve', 'wall']
-
-
-    main(mode='train', gpu_id=0, num_epoch=30,
-         train_batch_size=16, test_batch_size=1, classes=CLASSES,
-         pretrained=False, save_path='')
+    for alpha in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
+        for iter in range(5):
+            main(mode='train', gpu_id=0, num_epoch=1,
+                train_batch_size=16, test_batch_size=1, classes=CLASSES,
+                pretrained=False, save_path='', loss_fn=FocalLoss(alpha, 2.0))
