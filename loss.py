@@ -134,7 +134,7 @@ def focal_loss(input, target, alpha, gamma, reduction, eps, ignore_index):
 
     # compute the actual focal loss
     weight = torch.pow(1.0 - input_soft, gamma)
-    
+    #print(alpha)    
     # alpha, weight, input_soft : (B, C, H, W)
     # focal : (B, C, H, W)
     focal = -alpha * weight * torch.log(input_soft)
@@ -203,3 +203,24 @@ class FocalLoss(nn.Module):
 
     def forward(self, input, target):
         return focal_loss(input, target, self.alpha, self.gamma, self.reduction, self.eps, self.ignore_index)
+
+class CBFocalLoss(nn.Module):
+
+    def __init__(self, beta=0.9999, gamma = 2.0, reduction = 'mean', eps = 1e-8, ignore_index=30, samples_per_cls=[260603092, 684334, 343438, 1331800, 242235, 205003, 538888, 195197, 121579, 1652270, 142654, 3507510], device='cuda:0'):
+        super().__init__()
+        self.gamma = gamma
+        self.reduction = reduction
+        self.eps = eps
+        self.ignore_index = ignore_index
+        self.beta = beta
+        self.samples_per_cls = samples_per_cls
+        self.device = device
+
+    def forward(self, input, target):
+        samples_per_cls = np.array(self.samples_per_cls)
+        samples_per_cls = samples_per_cls
+        effective_num = 1.0 - np.power(self.beta, self.samples_per_cls)
+        weights = (1.0 - self.beta) / np.array(effective_num)
+        weights = weights / np.sum(weights) * len(self.samples_per_cls)
+        weights = torch.Tensor(weights).to(self.device)
+        return focal_loss(input, target, weights, self.gamma, self.reduction, self.eps, self.ignore_index)

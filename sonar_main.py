@@ -5,7 +5,7 @@ from eval import *
 import tqdm
 import random
 import csv
-from loss import FocalLoss
+from loss import FocalLoss, CBFocalLoss
 '''
 random_seed = 42
 torch.manual_seed(random_seed)
@@ -51,7 +51,7 @@ def validation_epoch(model, val_loader, num_class, device, epoch):
     class_iou, mean_iou = eval_net_loader(model, val_loader, num_class, device, epoch)
     print('Class IoU:', ' '.join(f'{x:.4f}' for x in class_iou), f'  |  Mean IoU: {mean_iou:.4f}')
     if save_csv and epoch == 'test':
-        with open(f'{csv_path}alpha_{alpha}_results_{iter}.csv', 'w', newline='') as f:
+        with open(f'{csv_path}gamma_{gamma}_results_{iter}.csv', 'w', newline='') as f:
             w = csv.writer(f, delimiter='\n')
             w.writerow(class_iou)
             w.writerow([mean_iou])
@@ -139,8 +139,12 @@ if __name__ =="__main__":
     CLASSES = ['background', 'bottle', 'can', 'chain',
                'drink-carton', 'hook', 'propeller', 'shampoo-bottle',
                'standing-bottle', 'tire', 'valve', 'wall']
-    for alpha in [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]:
-        for iter in range(5):
+    device = torch.device(f'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    beta = 0.999999
+    # gamma = 2.0
+    for iter in range(10):
+        for gamma in [0.6, 0.7, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4]: # 0.6 ~ 1.4
+            print(f'gamma: {gamma}\niter: {iter}')
             main(mode='train', gpu_id=0, num_epoch=30,
                 train_batch_size=16, test_batch_size=1, classes=CLASSES,
-                pretrained=False, save_path='', loss_fn=FocalLoss(alpha, 2.0))
+                pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma))
