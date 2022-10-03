@@ -213,11 +213,10 @@ class CBFocalLoss(nn.Module):
         self.eps = eps
         self.ignore_index = ignore_index
         self.beta = beta
-        self.samples_per_cls = samples_per_cls
+        self.samples_per_cls = np.array(samples_per_cls)
         self.device = device
 
     def forward(self, input, target):
-        self.samples_per_cls = np.array(self.samples_per_cls)
         effective_num = 1.0 - np.power(self.beta, self.samples_per_cls)
         weights = (1.0 - self.beta) / np.array(effective_num)
         weights = weights / np.sum(weights) * len(self.samples_per_cls)
