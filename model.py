@@ -144,28 +144,33 @@ class DeepResUnet(nn.Module):
         return x
 
 class VGGUnet(nn.Module):
-    """Unet with VGG-19 encoder.
+    """Unet with VGG-16 or VGG-19 encoder.
     """
     def __init__(self, in_channels=1, n_classes=12, encoder=models.vgg19):
         super().__init__()
-
         self.encoder = encoder(pretrained=False).features
         self.encoder[0] = nn.Conv2d(in_channels, 64, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1), bias=False)
-        self.block1 = nn.Sequential(*self.encoder[:4])      # 64
-        self.block2 = nn.Sequential(*self.encoder[4:9])     # 128
-        self.block3 = nn.Sequential(*self.encoder[9:18])    # 256
-        self.block4 = nn.Sequential(*self.encoder[18:27])   # 512
-        
-        self.block5 = nn.Sequential(*self.encoder[27:36])   # 512
+        if encoder == models.vgg19:
+            self.block1 = nn.Sequential(*self.encoder[:4])      # 64
+            self.block2 = nn.Sequential(*self.encoder[4:9])     # 128
+            self.block3 = nn.Sequential(*self.encoder[9:18])    # 256
+            self.block4 = nn.Sequential(*self.encoder[18:27])   # 512
+            self.block5 = nn.Sequential(*self.encoder[27:36])   # 512
+        elif encoder == models.vgg16:
+            self.block1 = nn.Sequential(*self.encoder[:4])      # 64
+            self.block2 = nn.Sequential(*self.encoder[4:9])     # 128
+            self.block3 = nn.Sequential(*self.encoder[9:16])    # 256
+            self.block4 = nn.Sequential(*self.encoder[16:23])   # 512
+            self.block5 = nn.Sequential(*self.encoder[23:30])   # 512
 
         self.up_conv6 = up_conv(512, 512)
-        self.conv6 = double_conv(1024, 512)
+        self.conv6 = double_conv(512+512, 512)
         self.up_conv7 = up_conv(512, 256)
-        self.conv7 = double_conv(512, 256)
+        self.conv7 = double_conv(256+256, 256)
         self.up_conv8 = up_conv(256, 128)
-        self.conv8 = double_conv(256, 128)
+        self.conv8 = double_conv(128+128, 128)
         self.up_conv9 = up_conv(128, 64)
-        self.conv9 = double_conv(128, 64)
+        self.conv9 = double_conv(64+64, 64)
         self.conv10 = nn.Conv2d(64, n_classes, kernel_size=1)
 
     def forward(self, x):
