@@ -51,7 +51,7 @@ def validation_epoch(model, val_loader, num_class, device, epoch):
     class_iou, mean_iou = eval_net_loader(model, val_loader, num_class, device, epoch)
     print('Class IoU:', ' '.join(f'{x:.4f}' for x in class_iou), f'  |  Mean IoU: {mean_iou:.4f}')
     if save_csv and epoch == 'test':
-        with open(f'{csv_path}gamma_{gamma}_results_{iter}.csv', 'w', newline='') as f:
+        with open(f'{csv_path}rn152_results_{iter}.csv', 'w', newline='') as f:
             w = csv.writer(f, delimiter='\n')
             w.writerow(class_iou)
             w.writerow([mean_iou])
@@ -83,8 +83,8 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
     # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet152).to(device).train()
     # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-    model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet34).to(device).train() 
-
+    # model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
+    model = VGGUnet(in_channels=1, n_classes=len(classes), encoder=models.vgg19).to(device).train()
     if 'train' in mode:
         if pretrained:
             model.load_state_dict(torch.load(pre_path))
@@ -141,10 +141,10 @@ if __name__ =="__main__":
                'standing-bottle', 'tire', 'valve', 'wall']
     device = torch.device(f'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     beta = 0.999999
-    # gamma = 2.0
+    gamma = 0.6
     for iter in range(10):
-        for gamma in [0.6, 0.7, 0.8, 0.9, 1.1, 1.2, 1.3, 1.4]: # 0.6 ~ 1.4
-            print(f'gamma: {gamma}\niter: {iter}')
-            main(mode='train', gpu_id=0, num_epoch=30,
-                train_batch_size=16, test_batch_size=1, classes=CLASSES,
-                pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma))
+        #for gamma in [0.6]: # 0.6 ~ 1.4
+        print(f'gamma: {gamma}\niter: {iter}')
+        main(mode='train', gpu_id=0, num_epoch=30,
+            train_batch_size=8, test_batch_size=1, classes=CLASSES,
+            pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma))
