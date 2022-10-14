@@ -47,17 +47,17 @@ def train_function(data, model, optimizer, loss_function, scheduler, device):
 
     print(f'Epoch finished ! Loss: {epoch_loss / index:.4f}, lr:{scheduler.get_last_lr()}')
 
-def validation_epoch(model, val_loader, num_class, device, epoch):
+def validation_epoch(model, val_loader, num_class, device, epoch, model_name):
     class_iou, mean_iou = eval_net_loader(model, val_loader, num_class, device, epoch)
     print('Class IoU:', ' '.join(f'{x:.4f}' for x in class_iou), f'  |  Mean IoU: {mean_iou:.4f}')
     if save_csv and epoch == 'test':
-        with open(f'{csv_path}rn152_results_{iter}.csv', 'w', newline='') as f:
+        with open(f'{csv_path}{model_name}_{dataset[:-1]}_results_{iter}.csv', 'w', newline='') as f:
             w = csv.writer(f, delimiter='\n')
             w.writerow(class_iou)
             w.writerow([mean_iou])
     return mean_iou
 
-def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path='', loss_fn = FocalLoss(0.25, 2.0)):
+def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path='', model_name = 'unet', loss_fn = torch.nn.CrossEntropyLoss(), dataset = ''):
     lr = 0.001
     save_term = 5
 
@@ -65,7 +65,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
 
     device = torch.device(f'cuda:{gpu_id}') if torch.cuda.is_available() else torch.device('cpu')
 
-    data_path = './data/segmentation/'
+    data_path = './data/segmentation/' + dataset
 
     dataset_train = sonarDataset(data_path + 'train', classes)
     dataset_val = sonarDataset(data_path + 'val', classes)
@@ -81,10 +81,23 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         dataset_test, batch_size=test_batch_size, shuffle=False, num_workers=0
     )
 
-    # model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet152).to(device).train()
-    # model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-    # model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
-    model = VGGUnet(in_channels=1, n_classes=len(classes), encoder=models.vgg19).to(device).train()
+    if model_name == 'resnet18':
+        model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet18).to(device).train() 
+    elif model_name == 'resnet34':
+        model = ResNetUNet(in_channels=1, n_classes=len(classes), encoder=models.resnet34).to(device).train() 
+    elif model_name == 'resnet50':
+        model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet50).to(device).train()
+    elif model_name == 'resnet101':
+        model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet101).to(device).train()
+    elif model_name == 'resnet152':
+        model = DeepResUnet(in_channels=1, n_classes=len(classes), encoder=models.resnet152).to(device).train()
+    elif model_name == 'vgg16':
+        model = VGGUnet(in_channels=1, n_classes=len(classes), encoder=models.vgg16).to(device).train()
+    elif model_name == 'vgg19':
+        model = VGGUnet(in_channels=1, n_classes=len(classes), encoder=models.vgg19).to(device).train()
+    elif model_name == 'unet':
+        model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
+
     if 'train' in mode:
         if pretrained:
             model.load_state_dict(torch.load(pre_path))
@@ -109,7 +122,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
             train_function(data_loader, model, optimizer, loss_function, lr_scheduler, device)
             lr_scheduler.step()
 
-            mean_iou = validation_epoch(model, data_loader_val, len(classes), device, epoch)
+            mean_iou = validation_epoch(model, data_loader_val, len(classes), device, epoch, model_name)
 
             state_dict = model.state_dict()
             if device == "cuda":
@@ -132,7 +145,7 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
             print('****************************')
         print('*** Test ***')
         model.load_state_dict(torch.load(pre_path))
-        validation_epoch(model, data_loader_test, len(classes), device, epoch='test')
+        validation_epoch(model, data_loader_test, len(classes), device, 'test', model_name)
 
 if __name__ =="__main__":
 
@@ -142,9 +155,31 @@ if __name__ =="__main__":
     device = torch.device(f'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     beta = 0.999999
     gamma = 0.6
-    for iter in range(10):
-        #for gamma in [0.6]: # 0.6 ~ 1.4
-        print(f'gamma: {gamma}\niter: {iter}')
-        main(mode='train', gpu_id=0, num_epoch=30,
-            train_batch_size=8, test_batch_size=1, classes=CLASSES,
-            pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma))
+
+    for iter in range(5):
+        for model_name in ['resnet34', 'resnet18', 'resnet50', 'unet', 'vgg16', 'vgg19', 'resnet101', 'resnet152']:
+            batch_size = 4
+            if model_name == 'resnet18':
+                batch_size = 16
+            elif model_name == 'resnet34':
+                batch_size = 16 
+            elif model_name == 'resnet50':
+                batch_size = 8
+            elif model_name == 'resnet101':
+                batch_size = 8
+            elif model_name == 'resnet152':
+                batch_size = 4
+            elif model_name == 'vgg16':
+                batch_size = 8
+            elif model_name == 'vgg19':
+                batch_size = 8
+            elif model_name == 'unet':
+                batch_size = 8
+
+            for dataset in ['single02/', 'single05/','single10/', 'single11/','single12/','multi02/','multi05/','multi10/','multi11/','multi12/']:
+                print(f'model: {model_name}')
+                print(f'dataset: {dataset}')
+                print(f'iter: {iter}')
+                main(mode='train', gpu_id=0, num_epoch=30,
+                    train_batch_size=batch_size, test_batch_size=1, classes=CLASSES,
+                    pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma), model_name=model_name, dataset=dataset)
