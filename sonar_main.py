@@ -5,7 +5,11 @@ from eval import *
 import tqdm
 import random
 import csv
+import os
 from loss import FocalLoss, CBFocalLoss
+
+import warnings
+warnings.filterwarnings(action='ignore')
 '''
 random_seed = 42
 torch.manual_seed(random_seed)
@@ -19,7 +23,7 @@ random.seed(random_seed)
 
 pre_path = './checkpoints/best_model.pth'
 save_csv = True
-csv_path = 'H:/내 드라이브/SONAR_Semantic_Segmentation/results/'
+csv_path = os.path.expanduser('~/GoogleDrive/SONAR_Semantic_Segmentation/results/')
 
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
@@ -103,12 +107,12 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
             model.load_state_dict(torch.load(pre_path))
             print('Model loaded from {}'.format(pre_path))
 
-        print('Starting training:\n'
+        print('\nStarting training:\n'
               f'Epochs: {num_epoch}\n'
               f'Batch size: {train_batch_size}\n'
               f'Learning rate: {lr}\n'
-              f'Training size: {len(data_loader.dataset)}\n'
-              f'Device: {str(device)}\n')
+              f'Training size: {len(data_loader.dataset)}\n')
+
 
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, betas=(0.9, 0.999))
         lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=1)
@@ -153,11 +157,13 @@ if __name__ =="__main__":
                'drink-carton', 'hook', 'propeller', 'shampoo-bottle',
                'standing-bottle', 'tire', 'valve', 'wall']
     device = torch.device(f'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
+    print(f'Device: {str(device)}\n')
+    
     beta = 0.999999
     gamma = 0.6
 
-    for iter in range(5):
-        for model_name in ['resnet34', 'resnet18', 'resnet50', 'unet', 'vgg16', 'vgg19', 'resnet101', 'resnet152']:
+    for iter in range(10):
+        for model_name in ['unet','vgg16','vgg19','resnet18','resnet34','resnet50','resnet101','resnet152']:
             batch_size = 4
             if model_name == 'resnet18':
                 batch_size = 16
@@ -166,15 +172,15 @@ if __name__ =="__main__":
             elif model_name == 'resnet50':
                 batch_size = 8
             elif model_name == 'resnet101':
-                batch_size = 8
+                batch_size = 4
             elif model_name == 'resnet152':
                 batch_size = 4
             elif model_name == 'vgg16':
-                batch_size = 8
+                batch_size = 4
             elif model_name == 'vgg19':
-                batch_size = 8
+                batch_size = 4
             elif model_name == 'unet':
-                batch_size = 8
+                batch_size = 4
 
             for dataset in ['single02/', 'single05/','single10/', 'single11/','single12/','multi02/','multi05/','multi10/','multi11/','multi12/']:
                 print(f'model: {model_name}')
