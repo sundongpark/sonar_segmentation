@@ -61,6 +61,11 @@ def validation_epoch(model, val_loader, num_class, device, epoch, model_name):
             w.writerow([mean_iou])
     return mean_iou
 
+def init_weights(m):
+    if type(m) == nn.Linear:
+        torch.nn.init.xavier_uniform_(m.weight)
+        m.bias.data.fill_(0.01)
+
 def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path='', model_name = 'unet', loss_fn = torch.nn.CrossEntropyLoss(), dataset = ''):
     lr = 0.001
     save_term = 5
@@ -101,7 +106,8 @@ def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1,
         model = VGGUnet(in_channels=1, n_classes=len(classes), encoder=models.vgg19).to(device).train()
     elif model_name == 'unet':
         model = UNet(in_channels=1, n_classes=len(classes)).to(device).train()
-
+    model.apply(init_weights)
+    
     if 'train' in mode:
         if pretrained:
             model.load_state_dict(torch.load(pre_path))
@@ -163,7 +169,7 @@ if __name__ =="__main__":
     gamma = 0.6
 
     for iter in range(10):
-        for model_name in ['unet','vgg16','vgg19','resnet18','resnet34','resnet50','resnet101','resnet152']:
+        for model_name in ['resnet18','resnet34','unet']:#['unet','vgg16','vgg19','resnet18','resnet34','resnet50','resnet101','resnet152']:
             batch_size = 4
             if model_name == 'resnet18':
                 batch_size = 16
