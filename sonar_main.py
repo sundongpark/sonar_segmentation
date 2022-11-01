@@ -6,6 +6,7 @@ import tqdm
 import random
 import csv
 import os
+import math
 from loss import FocalLoss, CBFocalLoss
 
 import warnings
@@ -62,9 +63,9 @@ def validation_epoch(model, val_loader, num_class, device, epoch, model_name):
     return mean_iou
 
 def init_weights(m):
-    if type(m) == nn.Linear:
-        torch.nn.init.xavier_uniform_(m.weight)
-        m.bias.data.fill_(0.01)
+    if isinstance(m, nn.Conv2d):
+        n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
+        m.weight.data.normal_(0, math.sqrt(2. / n))
 
 def main(mode='', gpu_id=0, num_epoch=31, train_batch_size=2, test_batch_size=1, classes=[], pretrained=False, save_path='', model_name = 'unet', loss_fn = torch.nn.CrossEntropyLoss(), dataset = ''):
     lr = 0.001
@@ -168,8 +169,8 @@ if __name__ =="__main__":
     beta = 0.999999
     gamma = 0.6
 
-    for iter in range(10):
-        for model_name in ['resnet18','resnet34','unet']:#['unet','vgg16','vgg19','resnet18','resnet34','resnet50','resnet101','resnet152']:
+    for iter in range(5, 10+1):
+        for model_name in ['resnet18','resnet34','resnet50','resnet101','resnet152','unet','vgg16','vgg19']:
             batch_size = 4
             if model_name == 'resnet18':
                 batch_size = 16
@@ -194,4 +195,5 @@ if __name__ =="__main__":
                 print(f'iter: {iter}')
                 main(mode='train', gpu_id=0, num_epoch=30,
                     train_batch_size=batch_size, test_batch_size=1, classes=CLASSES,
-                    pretrained=False, save_path='', loss_fn=CBFocalLoss(beta, gamma), model_name=model_name, dataset=dataset)
+                    pretrained=False, save_path='', loss_fn=torch.nn.CrossEntropyLoss(),#CBFocalLoss(beta, gamma),
+                    model_name=model_name, dataset=dataset)
