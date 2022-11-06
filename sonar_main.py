@@ -24,7 +24,7 @@ random.seed(random_seed)
 
 pre_path = './checkpoints/best_model.pth'
 save_csv = True
-csv_path = os.path.expanduser('~/GoogleDrive/SONAR_Semantic_Segmentation/results/')
+csv_path = 'H:/내 드라이브/SONAR_Semantic_Segmentation/results/'
 
 def train_function(data, model, optimizer, loss_function, scheduler, device):
     model.train()
@@ -165,17 +165,17 @@ if __name__ =="__main__":
                'standing-bottle', 'tire', 'valve', 'wall']
     device = torch.device(f'cuda:0') if torch.cuda.is_available() else torch.device('cpu')
     print(f'Device: {str(device)}\n')
-    
+
     beta = 0.999999
     gamma = 0.6
 
-    for iter in range(5, 10+1):
+    for iter in range(1, 10+1):
         for model_name in ['resnet18','resnet34','resnet50','resnet101','resnet152','unet','vgg16','vgg19']:
             batch_size = 4
             if model_name == 'resnet18':
                 batch_size = 16
             elif model_name == 'resnet34':
-                batch_size = 16 
+                batch_size = 16
             elif model_name == 'resnet50':
                 batch_size = 8
             elif model_name == 'resnet101':
@@ -189,7 +189,7 @@ if __name__ =="__main__":
             elif model_name == 'unet':
                 batch_size = 4
 
-            for dataset in ['single02/', 'single05/','single10/', 'single11/','single12/','multi02/','multi05/','multi10/','multi11/','multi12/']:
+            for dataset in ['sim_only/']:
                 print(f'model: {model_name}')
                 print(f'dataset: {dataset}')
                 print(f'iter: {iter}')
@@ -197,3 +197,7 @@ if __name__ =="__main__":
                     train_batch_size=batch_size, test_batch_size=1, classes=CLASSES,
                     pretrained=False, save_path='', loss_fn=torch.nn.CrossEntropyLoss(),#CBFocalLoss(beta, gamma),
                     model_name=model_name, dataset=dataset)
+                main(mode='train', gpu_id=0, num_epoch=30,
+                    train_batch_size=batch_size, test_batch_size=1, classes=CLASSES,
+                    pretrained=True, save_path='', loss_fn=torch.nn.CrossEntropyLoss(),#CBFocalLoss(beta, gamma),
+                    model_name=model_name, dataset='filter/')
